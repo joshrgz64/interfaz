@@ -7,11 +7,11 @@ Es una arquitectura relativamente reciente (lanzada en 2014) cuyas siglas en ing
 Risc-V es de código abierto. Opera tanto en espacios de direcciones de 32 bits como de 64 bits, y tiene soporte para su  implementación en procesadores multicore (2 - 16 nucleos) o manycore (hasta miles de nucleos simples).\
 La V en Risc-V significa que es la 5ta generación de arquitecturas RISC ISA por la Universidad de Berkeley, la V también significa "Vectorial" y "Variaciones",  los enfoques principales de esta arquitectura como veremos más adelantes.
 #### Extensión Vectorial RVV
-Como su nombre lo indica, Risc-V Vectorial Extension es una extensión de la ISA de Risc-V con el propósito de añadir soporte para operaciones vectoriales. Con vectores nos referimos a conjuntos dinámicos de datos (arrays) que pueden ser manipulados con gran facilidad a diferencia de los arrays tradicionales. Estas operaciones complementan las que el ISA base ejecuta para la gestión de memoria. Algunas de sus funciones incluyen el registro de vectores, la operación con vectores, su configuración, trabajar con "mascaras", y las operaciones de carga y almacenamiento.\
+Como su nombre lo indica, Risc-V Vectorial Extension es una extensión de la ISA de Risc-V con el propósito de añadir soporte para operaciones vectoriales. Con vectores nos referimos a conjuntos dinámicos de datos (arrays) con elementos del mismo tipo que pueden ser manipulados con gran facilidad a diferencia de los arrays tradicionales. Estas operaciones complementan las que el ISA base ejecuta para la gestión de memoria. Algunas de sus funciones incluyen el registro de vectores, la operación con vectores, su configuración, trabajar con "mascaras", y las operaciones de carga y almacenamiento.\
 RVV maneja dos variables clave,\
-Una es denominada **ELEN**, longitud del elemento, es el tamaño máximo en bits de un vector, debe ser una potencia de 2.\
-denominado **VLEN** el cual representa la longitud del registro de un solo vector en bits, utilizado en lugar de un valor constante. VLEN tiene que ser cualquier potencia de 2 no mayor a 16 y además debe ser mayor o igual a ELEN.\
-RVV maneja 32 registros vectoriales desde **v0 hasta v31**. Por defecto cada registro tiene un valor VLEN de 128, pero para implementaciones alternativas este valor puede ser cambiado permitiendo abarcar más información en menos registros, por ejemplo:
+Una es denominada **ELEN**, longitud del elemento, es el tamaño máximo de un elemento que una implementación podrá soportar, debe ser una potencia de 2.\
+denominado **VLEN** el cual representa la longitud del registro de un solo vector en bits, utilizado en lugar de un valor constante. VLEN tiene que ser una potencia de 2 que no supere los $2^{16}$ bits y además debe ser mayor o igual a ELEN.\
+RVV maneja 32 registros vectoriales desde **v0 hasta v31**. El valor VLEN es bastante flexible, por lo que para implementaciones diferentes este valor puede ser cambiado permitiendo abarcar más información en menos registros, por ejemplo:
 
 ```
 VLEN = 128
@@ -37,7 +37,7 @@ VLEN / SEW = 4 elementos
 Por lo tanto, cada elemento denominado a0 - a3 tendrá un valor de 32 bits, esto facilita el trabajo con múltiples datos al dividirlos en partes, especialmente si se trabaja con el máximo de $2^{16}$.\
 **VL** nos dice con cuántos elementos se trabajará a la vez una vez definida la cantidad de estos, por ejemplo tenemos 4 elementos totales, digamos que VL es igual a 2, entonces de esos vectores se trabajará con 2 elementos a la vez.
 
-**LMUL** es un multiplicador que permite agrupar múltiples registros vectoriales para unirlos en un solo registro y apoyar en el pase de más elementos. Su valor puede ser 1/8, 1/4, 1/2, 1, 2, 4, o 8; uno de ellos corresponderá al tamaño del grupo. Entonces volviendo al ejemplo anterior, si tuviéramos un LMUL de 4...
+**LMUL** es un multiplicador que permite agrupar múltiples registros vectoriales para unirlos en un nuevo grupo de registros y apoyar en el pase de más elementos. Su valor puede ser 1/8, 1/4, 1/2, 1, 2, 4, o 8; uno de ellos corresponderá al tamaño del grupo. Entonces volviendo al ejemplo anterior, si tuviéramos un LMUL de 4...
 ```
 VLEN = 128 bits
 SEW = 32 bits
@@ -58,8 +58,8 @@ VLMAX = (128 * 4)/32 = 16
 ```
 VLMAX aquí es igual a 16, lo que significa que el procesador con la configuración actual puede controlar hasta 16 elementos por operación.
 
-Crear código para la manipulación de múltiples elementos puede parecer tedioso si asumimos que se tendría que hacer esto para cada uno de ellos individualmente, es por esto que existe una técnica llamada stripmining, la misma consiste en iterar instrucciones de manera que no se tenga que repetir las mismas dentro del código, se crean bloques en base al valor de VLMAX, por ejemplo cada bloque procesará 16 elementos por iteración.\
-Veámoslo de esta manera, supongamos que tenemos 100 elementos y queremos procesarlos todos, como podemos procesarlos todos sin tener que llamar la operación 100 veces? stripmining como técnica resuelve esto de manera que si nuestro VLMAX es 16, entonces el bloque iterativo procesará 16 elementos por iteración, reduciendo considerablemente la carga de trabajo y optimizando el codigo.
+Crear código para la manipulación de múltiples elementos puede parecer tedioso si asumimos que se tendría que hacer esto para cada uno de ellos individualmente, es por esto que existe una técnica llamada stripmining, la misma consiste en iterar instrucciones de manera que el procesador pueda procesar grandes cantidades de datos de forma eficiente, se crean bloques en base al valor de VLMAX, por ejemplo cada bloque procesará 16 elementos por iteración.\
+Veámoslo de esta manera, supongamos que tenemos 100 elementos y queremos procesarlos todos, como podemos procesarlos todos sin tener que llamar la operación 100 veces? stripmining como técnica resuelve esto de manera que si nuestro VLMAX es 16, entonces el bloque iterativo procesará 16 elementos por iteración.
 
 Ah, pero si contamos bien...
 ```
@@ -72,12 +72,12 @@ Quedan 4 elementos sin procesar, acaso se pueden procesar aun asi? Claro que si,
 ```
 iter 7 --> elems 96 - 99
 ```
-Para cerrar con RVV veamos un ejemplo practico de su uso. Digamos que en su lugar contamos con un total de 20 elementos, sumaremos todos a un nuevo vector, pero cómo? Ahí es donde entra una función útil en las pruebas de rendimiento.
+Para cerrar con RVV veamos un ejemplo practico de su uso. Digamos que en su lugar contamos con un total de 20 elementos, queremos hacer una cierta prueba de rendimiento, pero cómo? Ahí es donde entra una función útil en las pruebas de rendimiento.
 ```assembly
 # void saxpy(size_t n, float a, const float *x, float *y)
 # a0 = n, fa0 = a, a1 = x, a2 = y
 loop:
-    vsetvli  t0, a0, e32, m8, ta, ma   # t0 = elements this pass
+    vsetvli  t0, a0, e32, m2, ta, ma   # t0 = elements this pass
 
     vle32.v  v0, (a1)                  # load x[i..i+vl]
 
@@ -100,13 +100,13 @@ Para recordar bien los parámetros tienes que saber que para este nuevo ejemplo:
 ```
 a0 = 20 (elementos restantes, hasta ahora no se ha procesado ninguno)
 e32 = SEW = 32
-m1 = LMUL = 1
+m2 = LMUL = 1
 t0 es donde los resultados se almacenarán
 ```
-la instrucción `vsetvli t0, a0, e32, m8, ta, ma` pide al CPU procesar la cantidad necesaria que indique `a0`, estos elementos son de 32 bits y su LMUL es de 1, y el resultado de la operación será guardado en `t0`.
+la instrucción `vsetvli t0, a0, e32, m2, ta, ma` pide al CPU procesar la cantidad necesaria que indique `a0`, estos elementos son de 32 bits y su LMUL es de 2, y el resultado de la operación será guardado en `t0`.
 Digamos que nuestro `VLMAX = 8`, y sabemos que tenemos 20 elementos. RVV por medio de vsetvli obtiene un VL en base a los parámetros ingresados. Entonces con esto nos daría un valor de `t0 = 8`.
 
-`vle32.v v0, (a1)` es una instrucción que carga un elemento de 32 bits hacia los registros vectoriales.\
+`vle32.v v0, (a1)` es una instrucción que carga elementos de 32 bits hacia los registros vectoriales.\
 Después `sub a0, a0, t0` lo que hace es restar `a0` con `t0` y guardar el resultado devuelta en `a0`. La operación sería `20 - 8` pues `a0 = 20` y `t0 = 8`. Entonces ahora `a0 = 12`\
 `slli t1, t0, 2` nos dice una sola cosa, primero que nada 32 bits es equivalente a 4 bytes, entonces con esta instrucción se define con cuantos bytes se trabajará, `8 elementos * 4 bytes = 32 bytes`\
 `add a1, a1, t1` indica que el puntero 1 avanza hacia delante.\
@@ -117,7 +117,7 @@ vfmacc.vf v8, fa0, v0
 vse32.v  v8, (a2)
 ```
 Primero cargamos los elementos hacia un registro 8, en seguida de esto sigue la instrucción `vfmacc.vf` hace la operación SAXPY, tomando el registro `v8` donde se almacenará el resultado, `fa0` es un punto flotante, y `v0` es el registro inicial.
-Cuando el resultado haya sido guardado en el registro v8, entonces se vuelve a cargar.
+Cuando el resultado haya sido guardado en el registro v8, entonces se vuelve a almacenar en la memoria.
 ```
 add a2, a2, t1
 bnez a0, loop
