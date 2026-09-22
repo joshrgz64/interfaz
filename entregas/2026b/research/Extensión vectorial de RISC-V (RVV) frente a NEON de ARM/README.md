@@ -125,14 +125,19 @@ bnez a0, loop
 Se incrementa el contador a2, una vez hecho esto llegamos a la instrucción de loop, por lo que empezamos de nuevo, y así hasta que se hallan procesado todos los 20 elementos.
 
 ### Arm NEON
+Neon es una implementación de la extensión para arquitecturas de CPUs Arm la cual trabaja con instrucciones SIMD avanzadas, las cuales trabajan con datos en 64 o 128 bits. Diseñado para mejorar el rendimiento en el procesamiento de datos multimedia, entre ellos no limitado a: codificación y decodificación de video y audio, procesamiento de gráficos 3D, voz e imagenes.
 
 #### Modelo SIMD
+**SIMD** significa que con una sola instrucción se pueden procesar tipos de datos diferentes (Single Instruction Multiple Data), por ejemplo con una sola instrucción la misma puede trabajar tanto con imágenes como con video, o con audio, todo de forma paralela.\
+Visto de otra manera, SIMD permite que en vez de hacer digamos, 7 operaciones de forma separada entre valores de dos arreglos, con una sola instrucción se hagan las 7 operaciones de manera paralela.
 
 ## Conclusión
 
 ## Bibliografía 
-* https://www.arm.com/glossary/isa
-* https://www.digikey.com.mx/es/resources/risc-v
-* https://docs.riscv.org/reference/isa/v20260120/unpriv/intro.html
-* https://lucaberton.com/blog/risc-v-vector-extension-rvv-programming/
+* Arm. “What is Instruction Set Architecture (ISA)?” Arm. Accedido el 22 de septiembre de 2026. [En línea]. Disponible: https://www.arm.com/glossary/isa
+* DigiKey. “Introducción a RISC-V”. DigiKey. Accedido el 22 de septiembre de 2026. [En línea]. Disponible: https://www.digikey.com.mx/es/resources/risc-v
+* Risc-V. “Introduction”. RISC-V Ratified Specifications Library. Accedido el 22 de septiembre de 2026. [En línea]. Disponible: https://docs.riscv.org/reference/isa/v20260120/unpriv/intro.html
+* L. Berton. “RISC-V Vector Programming with RVV 1.0”. Luca Berton. Accedido el 22 de septiembre de 2026. [En línea]. Disponible: https://lucaberton.com/blog/risc-v-vector-extension-rvv-programming/
+* “Overview”. Arm Support. Accedido el 22 de septiembre de 2026. [En línea]. Disponible: https://support.arm.com/documentation/102159/0400/Overview
+* https://developer.mozilla.org/es/docs/Glossary/SIMD
 * 
