@@ -35,9 +35,94 @@ SEW = 32 bits
 VLEN / SEW = 4 elementos
 ```
 Por lo tanto, cada elemento denominado a0 - a3 tendrá un valor de 32 bits, esto facilita el trabajo con múltiples datos al dividirlos en partes, especialmente si se trabaja con el máximo de $2^{16}$.\
-**VL** nos dice con cuántos elementos se trabajará a la vez una vez definida la cantidad de estos, este valor en este caso es el número de elementos al que llegamos anteriormente, este sería el vector $[a0,a1,a2,a3]$.\
+**VL** nos dice con cuántos elementos se trabajará a la vez una vez definida la cantidad de estos, por ejemplo tenemos 4 elementos totales, digamos que VL es igual a 2, entonces de esos vectores se trabajará con 2 elementos a la vez.
 
-Crear codigo para la manipulación de multiples elementos puede parecer tedioso si asumimos que se tendría que hacer esto para cada uno de ellos individualmente // Terminar mañana explicación sobre stripmining
+**LMUL** es un multiplicador que permite agrupar múltiples registros vectoriales para unirlos en un solo registro y apoyar en el pase de más elementos. Su valor puede ser 1/8, 1/4, 1/2, 1, 2, 4, o 8; uno de ellos corresponderá al tamaño del grupo. Entonces volviendo al ejemplo anterior, si tuviéramos un LMUL de 4...
+```
+VLEN = 128 bits
+SEW = 32 bits
+LMUL = 4
+4 elementos * LMUL = 16 elementos de 32 bits
+```
+LMUL permite que el procesador trabaje con más elementos por medio de grupos multiplicados.\
+Seguimos con **VLMAX**, el cual nos dice finalmente cuál es el valor máximo de elementos que se pueden manejar con la configuración definida hasta ahora por grupo. Su valor es igual a el producto de VLEN y LMUL sobre SEW, ósea...
+
+$VLMAX=\frac{VLEN \cdot LMUL}{SEW}$
+
+Por lo que  si tomamos los valores actuales...
+```
+VLEN = 128 bits
+LMUL = 4
+SEW = 32 bits
+VLMAX = (128 * 4)/32 = 16
+```
+VLMAX aquí es igual a 16, lo que significa que el procesador con la configuración actual puede controlar hasta 16 elementos por operación.
+
+Crear código para la manipulación de múltiples elementos puede parecer tedioso si asumimos que se tendría que hacer esto para cada uno de ellos individualmente, es por esto que existe una técnica llamada stripmining, la misma consiste en iterar instrucciones de manera que no se tenga que repetir las mismas dentro del código, se crean bloques en base al valor de VLMAX, por ejemplo cada bloque procesará 16 elementos por iteración.\
+Veámoslo de esta manera, supongamos que tenemos 100 elementos y queremos procesarlos todos, como podemos procesarlos todos sin tener que llamar la operación 100 veces? stripmining como técnica resuelve esto de manera que si nuestro VLMAX es 16, entonces el bloque iterativo procesará 16 elementos por iteración, reduciendo considerablemente la carga de trabajo y optimizando el codigo.
+
+Ah, pero si contamos bien...
+```
+iter 1 --> elems 0 - 15
+iter 2 --> elems 16 - 31
+...
+iter 6 --> elems 80 - 95
+```
+Quedan 4 elementos sin procesar, acaso se pueden procesar aun asi? Claro que si, si el VL que son los elementos  que se pueden procesar a la vez era 16, a partir de este punto VL pasa a ser igual a 4, esto permite terminar de procesar los elementos que faltan.
+```
+iter 7 --> elems 96 - 99
+```
+Para cerrar con RVV veamos un ejemplo practico de su uso. Digamos que en su lugar contamos con un total de 20 elementos, sumaremos todos a un nuevo vector, pero cómo? Ahí es donde entra una función útil en las pruebas de rendimiento.
+```assembly
+# void saxpy(size_t n, float a, const float *x, float *y)
+# a0 = n, fa0 = a, a1 = x, a2 = y
+loop:
+    vsetvli  t0, a0, e32, m8, ta, ma   # t0 = elements this pass
+
+    vle32.v  v0, (a1)                  # load x[i..i+vl]
+
+    sub      a0, a0, t0                # n -= vl
+
+    slli     t1, t0, 2                 # bytes = vl * 4
+
+    add      a1, a1, t1                # x += vl
+
+    vle32.v  v8, (a2)                  # load y[i..i+vl]
+    vfmacc.vf v8, fa0, v0             # y = a*x + y (fused multiply-add)
+    vse32.v  v8, (a2)                  # store y back
+
+    add      a2, a2, t1                # y += vl
+    bnez     a0, .loop                 # repeat until done
+```
+¿Qué significa esta función?\
+Lo que ves es una función SAXPY (Single-expression A times X Plus Y), una función fundamental en la prueba de CPUs y GPUs con cualidades vectoriales la cual efectúa la ecuación $y = a \cdot x + y$.
+Para recordar bien los parámetros tienes que saber que para este nuevo ejemplo:
+```
+a0 = 20 (elementos restantes, hasta ahora no se ha procesado ninguno)
+e32 = SEW = 32
+m1 = LMUL = 1
+t0 es donde los resultados se almacenarán
+```
+la instrucción `vsetvli t0, a0, e32, m8, ta, ma` pide al CPU procesar la cantidad necesaria que indique `a0`, estos elementos son de 32 bits y su LMUL es de 1, y el resultado de la operación será guardado en `t0`.
+Digamos que nuestro `VLMAX = 8`, y sabemos que tenemos 20 elementos. RVV por medio de vsetvli obtiene un VL en base a los parámetros ingresados. Entonces con esto nos daría un valor de `t0 = 8`.
+
+`vle32.v v0, (a1)` es una instrucción que carga un elemento de 32 bits hacia los registros vectoriales.\
+Después `sub a0, a0, t0` lo que hace es restar `a0` con `t0` y guardar el resultado devuelta en `a0`. La operación sería `20 - 8` pues `a0 = 20` y `t0 = 8`. Entonces ahora `a0 = 12`\
+`slli t1, t0, 2` nos dice una sola cosa, primero que nada 32 bits es equivalente a 4 bytes, entonces con esta instrucción se define con cuantos bytes se trabajará, `8 elementos * 4 bytes = 32 bytes`\
+`add a1, a1, t1` indica que el puntero 1 avanza hacia delante.\
+Ahora entramos a la parte importante
+```
+vle32.v  v8, (a2)
+vfmacc.vf v8, fa0, v0
+vse32.v  v8, (a2)
+```
+Primero cargamos los elementos hacia un registro 8, en seguida de esto sigue la instrucción `vfmacc.vf` hace la operación SAXPY, tomando el registro `v8` donde se almacenará el resultado, `fa0` es un punto flotante, y `v0` es el registro inicial.
+Cuando el resultado haya sido guardado en el registro v8, entonces se vuelve a cargar.
+```
+add a2, a2, t1
+bnez a0, loop
+```
+Se incrementa el contador a2, una vez hecho esto llegamos a la instrucción de loop, por lo que empezamos de nuevo, y así hasta que se hallan procesado todos los 20 elementos.
 
 ### Arm NEON
 
@@ -49,4 +134,5 @@ Crear codigo para la manipulación de multiples elementos puede parecer tedioso 
 * https://www.arm.com/glossary/isa
 * https://www.digikey.com.mx/es/resources/risc-v
 * https://docs.riscv.org/reference/isa/v20260120/unpriv/intro.html
+* https://lucaberton.com/blog/risc-v-vector-extension-rvv-programming/
 * 
