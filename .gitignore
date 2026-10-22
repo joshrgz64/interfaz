@@ -9,6 +9,13 @@ CLAUDE.md
 # Repositorio anidado (clon independiente)
 units/pdd/
 
+# Auditorías internas del docente (no se versionan)
+auditoria/
+
+# Bóveda de Obsidian del docente (configuración local)
+.obsidian/
+.trash/
+
 # Artefactos de compilación (ensamblador/C)
 *.o
 *.out
@@ -16,3 +23,12 @@ a.out
 *.elf
 *.so
 prog
+
+# Documentales (video y subtítulos con derechos de autor; solo uso local)
+units/U02-programacion-basica/documentales/*.mp4
+units/U02-programacion-basica/documentales/*.mkv
+units/U02-programacion-basica/documentales/*.webm
+units/U02-programacion-basica/documentales/*.vtt
+
+# Videos
+*.mp4
