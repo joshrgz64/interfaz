@@ -1,13 +1,13 @@
-// ╔══════════════════════════════════════════════════════════╗
-// ║  Programa : main.s                                         ║
-// ║  Autor    : <Nombre Apellido> <No. de control>             ║
-// ║  Curso    : Lenguajes de Interfaz SCC-1014                 ║
-// ║  Fecha    : <AAAA-MM-DD>                                   ║
-// ║  Descripción: <qué hace el programa>                       ║
-// ╚══════════════════════════════════════════════════════════╝
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  Programa : main.s                                                         ║
+// ║  Autor    : Joshua Nezib Rodriguez Camarena - 24210524                     ║
+// ║  Curso    : Lenguajes de Interfaz SCC-1014                                 ║
+// ║  Fecha    : 10-22-2026                                                     ║
+// ║  Descripción: Imprime un Hello world saludando con un nombre especifico    ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
 
         .section .data
-msg:    .asciz  "Hola Mundo en ARM64\n"
+msg:    .asciz  "Hola Joshua en ARM64\n"
 len     =       . - msg - 1          // longitud sin el NUL
 
         .section .text
@@ -27,4 +27,4 @@ _start:
         svc     #0
 
 // Conclusiones/Observaciones:
-// - <qué aprendiste, qué ajustaste, cómo validaste>
+// Cambie una sola linea para saludarme a mi mismo, forever alone
